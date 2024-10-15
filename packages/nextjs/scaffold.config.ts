@@ -1,4 +1,5 @@
 import * as chains from "viem/chains";
+import { Chain } from "viem/chains";
 
 export type ScaffoldConfig = {
   targetNetworks: readonly chains.Chain[];
@@ -9,9 +10,49 @@ export type ScaffoldConfig = {
   walletAutoConnect: boolean;
 };
 
+// Custom chain definitions for our local chains
+const opchainA: Chain = {
+  id: 901,
+  name: "OPChainA",
+  network: "opchainA",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH",
+  },
+  rpcUrls: {
+    default: {
+      http: ["http://localhost:9545"],
+    },
+    public: {
+      http: ["http://localhost:9545"],
+    },
+  },
+};
+
+const opchainB: Chain = {
+  id: 902,
+  name: "OPChainB",
+  network: "opchainB",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH",
+  },
+  rpcUrls: {
+    default: {
+      http: ["http://localhost:9546"],
+    },
+    public: {
+      http: ["http://localhost:9546"],
+    },
+  },
+};
+
 const scaffoldConfig = {
   // The networks on which your DApp is live
-  targetNetworks: [chains.hardhat, chains.optimismSepolia, chains.baseSepolia],
+  // targetNetworks: [chains.hardhat, chains.optimismSepolia, chains.baseSepolia],
+  targetNetworks: [chains.hardhat, opchainA, opchainB],
 
   // The interval at which your front-end polls the RPC servers for new data
   // it has no effect if you only target the local network (default is 4000)

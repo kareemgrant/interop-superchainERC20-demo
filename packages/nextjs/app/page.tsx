@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { BugAntIcon, CurrencyDollarIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
 
 const Home: NextPage = () => {
@@ -57,6 +57,16 @@ const Home: NextPage = () => {
                 Explore your local transactions with the{" "}
                 <Link href="/blockexplorer" passHref className="link">
                   Block Explorer
+                </Link>{" "}
+                tab.
+              </p>
+            </div>
+            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
+              <CurrencyDollarIcon className="h-8 w-8 fill-secondary" />
+              <p>
+                Try out the cross-chain purchase demo in the{" "}
+                <Link href="/purchase" passHref className="link">
+                  Cross-Chain Purchase Demo
                 </Link>{" "}
                 tab.
               </p>

@@ -17,6 +17,7 @@
     "hardhat-verify": "hardhat verify"
   },
   "devDependencies": {
+    "@eth-optimism/contracts-bedrock": "^0.17.3",
     "@ethersproject/abi": "^5.7.0",
     "@ethersproject/providers": "^5.7.1",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.3",
@@ -38,7 +39,7 @@
     "eslint-plugin-prettier": "^4.2.1",
     "ethers": "^6.10.0",
     "execa": "^8.0.1",
-    "hardhat": "^2.19.4",
+    "hardhat": "^2.22.13",
     "hardhat-deploy": "^0.11.45",
     "hardhat-deploy-ethers": "^0.4.1",
     "hardhat-gas-reporter": "^1.0.9",

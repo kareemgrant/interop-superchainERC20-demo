@@ -8,38 +8,73 @@ import {
   safeWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
-import * as chains from "viem/chains";
-import { configureChains } from "wagmi";
-import { alchemyProvider } from "wagmi/providers/alchemy";
+import { Chain, configureChains } from "wagmi";
 import { publicProvider } from "wagmi/providers/public";
 import scaffoldConfig from "~~/scaffold.config";
 import { burnerWalletConfig } from "~~/services/web3/wagmi-burner/burnerWalletConfig";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
 
-const targetNetworks = getTargetNetworks();
+// Define the local chain configuration for ChainID 901
+export const localChain901: Chain = {
+  id: 901,
+  name: "OPChainA",
+  network: "opchainA",
+  nativeCurrency: {
+    name: "ETH",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ["http://127.0.0.1:9545"],
+    },
+    public: {
+      http: ["http://127.0.0.1:9545"],
+    },
+  },
+  blockExplorers: {
+    default: { name: "Local Explorer A", url: "http://127.0.0.1:9545" },
+  },
+  testnet: true,
+};
+
+// Update localChain902 to align properly for use in your testnet
+export const localChain902: Chain = {
+  id: 902,
+  name: "OPChainB",
+  network: "opchainB",
+  nativeCurrency: {
+    name: "ETH",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ["http://127.0.0.1:9546"],
+    },
+    public: {
+      http: ["http://127.0.0.1:9546"],
+    },
+  },
+  blockExplorers: {
+    default: { name: "Local Explorer B", url: "http://127.0.0.1:9546" },
+  },
+  testnet: true,
+};
+
+// Make sure we only have relevant target networks
+const targetNetworks = [...getTargetNetworks(), localChain901, localChain902];
 const { onlyLocalBurnerWallet } = scaffoldConfig;
 
-// We always want to have mainnet enabled (ENS resolution, ETH price, etc). But only once.
-const enabledChains = targetNetworks.find(network => network.id === 1)
-  ? targetNetworks
-  : [...targetNetworks, chains.mainnet];
-
-/**
- * Chains for the app
- */
+// Updated chains for the app focusing on only testnets and local environments
 export const appChains = configureChains(
-  enabledChains,
+  targetNetworks,
   [
-    alchemyProvider({
-      apiKey: scaffoldConfig.alchemyApiKey,
-    }),
     publicProvider(),
   ],
   {
-    // We might not need this checkout https://github.com/scaffold-eth/scaffold-eth-2/pull/45#discussion_r1024496359, will test and remove this before merging
     stallTimeout: 3_000,
-    // Sets pollingInterval if using chains other than local hardhat chain
-    ...(targetNetworks.find(network => network.id !== chains.hardhat.id)
+    ...(targetNetworks.find(network => network.id !== 31337)
       ? {
           pollingInterval: scaffoldConfig.pollingInterval,
         }
@@ -55,7 +90,7 @@ const wallets = [
   braveWallet(walletsOptions),
   coinbaseWallet({ ...walletsOptions, appName: "scaffold-eth-2" }),
   rainbowWallet(walletsOptions),
-  ...(!targetNetworks.some(network => network.id !== chains.hardhat.id) || !onlyLocalBurnerWallet
+  ...(!targetNetworks.some(network => network.id !== 31337) || !onlyLocalBurnerWallet
     ? [
         burnerWalletConfig({
           chains: appChains.chains.filter(chain => targetNetworks.map(({ id }) => id).includes(chain.id)),
