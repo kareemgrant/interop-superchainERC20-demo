@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { Menu } from "@headlessui/react";
 import { ethers } from "ethers";
-import { formatEther, parseEther } from "ethers";
+import { BrowserProvider, formatEther, parseEther } from "ethers";
 import ReactConfetti from "react-confetti";
 import { MoonLoader } from "react-spinners";
 import { useAccount, useNetwork } from "wagmi";
@@ -32,6 +32,7 @@ const localChain902 = {
 
 const L2NativeSuperchainERC20Address = "0x420beeF000000000000000000000000000000001";
 const StoreContractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const SuperchainERC20BridgeAddress = "0x4200000000000000000000000000000000000028";
 const ITEM_PRICE = parseEther("10");
 
 const erc20ABI = [
@@ -41,6 +42,8 @@ const erc20ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
 ];
+
+const superchainBridgeABI = ["function sendERC20(address _token, address _to, uint256 _amount, uint256 _chainId)"];
 
 const storeABI = [
   "function completePurchase(address buyer, uint256 itemId) external",
@@ -53,7 +56,7 @@ const storeABI = [
   "event TicketPurchased(address buyer, uint256 newTotalTickets)",
 ];
 
-export const Purchase = () => {
+export const NewPurchase = () => {
   const { address } = useAccount();
   const { chain } = useNetwork();
   const [balanceChain901, setBalanceChain901] = useState<string>("Loading...");
@@ -66,8 +69,6 @@ export const Purchase = () => {
   const [purchasedTickets, setPurchasedTickets] = useState(0);
   const [transactionStatus, setTransactionStatus] = useState("");
   const [transactionHash, setTransactionHash] = useState("");
-
-  const HARDCODED_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // Hardcoded private key of user 0 provided by supersim, do not uese these in production
 
   useEffect(() => {
     fetchBalances();
@@ -111,8 +112,14 @@ export const Purchase = () => {
   const fetchTicketCount = async () => {
     try {
       const provider = new ethers.JsonRpcProvider(localChain902.rpcUrls.default.http[0]);
+      console.log(provider);
+
       const storeContract = new ethers.Contract(StoreContractAddress, storeABI, provider);
+      console.log(storeContract)
+
       const count = await storeContract.getTicketCount(address);
+      console.log(address)
+
       console.log("ticket count");
       console.log(count);
       setPurchasedTickets(Number(count));
@@ -142,119 +149,24 @@ export const Purchase = () => {
 
   const handleSameChainPurchase = async () => {
     try {
-      const provider902 = new ethers.JsonRpcProvider(localChain902.rpcUrls.default.http[0]);
-      const signer902 = new ethers.Wallet(HARDCODED_PRIVATE_KEY, provider902);
-
-      const tokenContract902 = new ethers.Contract(L2NativeSuperchainERC20Address, erc20ABI, signer902);
-
-      setTransactionStatus("Requesting approval");
-      console.log("Approving Store contract to transfer tokens on Chain 902...");
-      const approveTx = await tokenContract902.approve(StoreContractAddress, ITEM_PRICE);
-      await approveTx.wait();
-      console.log("Approval successful");
-
-      setTransactionStatus("Completing purchase");
-      console.log("Completing purchase on Chain 902...");
-      const storeContract = new ethers.Contract(StoreContractAddress, storeABI, signer902);
-
-      const purchaseTx = await storeContract.completePurchase(address, 1, {
-        gasLimit: 500000,
-      });
-      console.log("Purchase transaction sent", purchaseTx.hash);
-
-      const receipt = await purchaseTx.wait();
-      console.log("Purchase transaction receipt", receipt);
-
-      if (receipt.status === 0) {
-        throw new Error("Transaction failed");
-      }
-
-      setTransactionHash(purchaseTx.hash);
-      console.log("Purchase completed successfully");
-      await fetchBalances();
-      setShowBalanceSelector(false);
-    } catch (error) {
-      console.error("Same-chain purchase failed:", error);
-    }
-  };
-
-  const handleCrossChainPurchase = async () => {
-    try {
-      // Step 1: User on Chain 902 requests tokens from Chain 901 by calling sendERC20 on L2NativeSuperchain token
-      const provider901 = new ethers.JsonRpcProvider(localChain901.rpcUrls.default.http[0]);
-      const signer901 = new ethers.Wallet(HARDCODED_PRIVATE_KEY, provider901);
-      const tokenContract901 = new ethers.Contract(L2NativeSuperchainERC20Address, erc20ABI, signer901);
-
-      console.log("Initiating cross-chain sendERC20 on Chain 901...");
-      setTransactionStatus(
-        `Initiating cross-chain transaction to transfer ${ethers.formatEther(ITEM_PRICE)} Mock from OPChainA`,
-      );
-      const tx = await tokenContract901.sendERC20(address, ITEM_PRICE, localChain902.id);
-
-      console.log("Transaction sent, waiting for confirmation...");
-      const txReceipt = await tx.wait();
-
-      console.log("sendERC20 transaction confirmed: ", txReceipt.transactionHash);
-      console.log("Tokens received on Chain 902. Proceeding with purchase...");
-      setTransactionStatus("Tokens received on OPChainB. Proceeding with purchase..");
-
-      // Step 2: Approve the store contract to transfer tokens on Chain 902
-
-      console.log("Approving Store contract to transfer tokens on Chain 902...");
-      const provider902 = new ethers.JsonRpcProvider(localChain902.rpcUrls.default.http[0]);
-      const signer902 = new ethers.Wallet(HARDCODED_PRIVATE_KEY, provider902);
+      const provider902 = new BrowserProvider(window.ethereum);
+      const signer902 = await provider902.getSigner();
 
       // Create a token contract instance for chain 902 with the signer
       const tokenContract902 = new ethers.Contract(L2NativeSuperchainERC20Address, erc20ABI, signer902);
       console.log("Token contract address on Chain 902:", L2NativeSuperchainERC20Address);
-      const tokenSymbol = await tokenContract902.symbol();
-      console.log("Token symbol on Chain 902:", tokenSymbol);
 
-      // Request approval
       setTransactionStatus("Requesting approval");
+      // Step 2: Approve the store contract to transfer tokens on Chain 902
       const approveTx = await tokenContract902.approve(StoreContractAddress, ITEM_PRICE);
       await approveTx.wait();
       console.log("Approval successful");
-
-      const allowance = await checkAllowance();
-      console.log(allowance);
 
       // Step 3: Complete the purchase on Chain 902
       console.log("Completing purchase on Chain 902...");
       setTransactionStatus("Completing purchase");
       const storeContract = new ethers.Contract(StoreContractAddress, storeABI, signer902);
       console.log("Store contract address:", StoreContractAddress);
-
-      // Check if the contract exists at the given address
-      const code = await provider902.getCode(StoreContractAddress);
-      if (code === "0x") {
-        throw new Error("No contract found at the specified address");
-      }
-
-      // Log the ABI of the contract
-      console.log("Store contract ABI:", JSON.stringify(storeABI));
-
-      // Try to call a simple view function first
-      try {
-        const itemStock = await storeContract.getItemStock(1);
-        console.log("Item stock:", itemStock.toString());
-      } catch (error) {
-        console.error("Error calling getItemStock:", error);
-      }
-
-      // Now try to get the item price
-      try {
-        const itemPrice = await storeContract.getItemPrice(1);
-        console.log("Item price:", ethers.formatEther(itemPrice));
-      } catch (error) {
-        console.error("Error calling getItemPrice:", error);
-      }
-
-      // Log balance and allowance before purchase
-      const balanceBefore = await tokenContract902.balanceOf(address);
-      const allowanceBefore = await tokenContract902.allowance(address, StoreContractAddress);
-      console.log("Balance before purchase:", ethers.formatEther(balanceBefore));
-      console.log("Allowance before purchase:", ethers.formatEther(allowanceBefore));
 
       // Attempt to complete purchase
       const purchaseTx = await storeContract.completePurchase(address, 1, {
@@ -274,13 +186,82 @@ export const Purchase = () => {
         throw new Error("Transaction failed");
       }
 
-      // Log balance and allowance after purchase
-      const balanceAfter = await tokenContract902.balanceOf(address);
-      const allowanceAfter = await tokenContract902.allowance(address, StoreContractAddress);
-      console.log("Balance after purchase:", ethers.formatEther(balanceAfter));
-      console.log("Allowance after purchase:", ethers.formatEther(allowanceAfter));
-
       console.log("Purchase completed successfully");
+      await fetchBalances();
+      setShowBalanceSelector(false);
+    } catch (error) {
+      console.error("Same-chain purchase failed:", error);
+    }
+  };
+
+  const handleCrossChainPurchase = async () => {
+    try {
+      // Step 1: User on Chain 902 requests tokens from Chain 901 by calling sendERC20 on L2NativeSuperchain token
+      const provider901 = new ethers.JsonRpcProvider(localChain901.rpcUrls.default.http[0]);
+      const signer901 = await provider901.getSigner(address);
+
+      const superchainBridgeContract901 = new ethers.Contract(
+        SuperchainERC20BridgeAddress,
+        superchainBridgeABI,
+        signer901,
+      );
+
+      console.log("Initiating cross-chain sendERC20 on Chain 901...");
+      setTransactionStatus(
+        `Initiating cross-chain transaction to transfer ${ethers.formatEther(ITEM_PRICE)} Mock from OPChainA`,
+      );
+      const tx = await superchainBridgeContract901.sendERC20(
+        L2NativeSuperchainERC20Address,
+        address,
+        ITEM_PRICE,
+        localChain902.id,
+      );
+
+      console.log("Transaction sent, waiting for confirmation...");
+      const txReceipt = await tx.wait();
+
+      console.log("sendERC20 transaction confirmed: ", txReceipt.transactionHash);
+      console.log("Tokens received on Chain 902. Proceeding with purchase...");
+      setTransactionStatus("Tokens received on OPChainB. Proceeding with purchase..");
+
+      // Step 2: Approve the store contract to transfer tokens on Chain 902
+      console.log("Approving Store contract to transfer tokens on Chain 902...");
+      const provider902 = new BrowserProvider(window.ethereum);
+      const signer902 = await provider902.getSigner();
+
+      // Create a token contract instance for chain 902 with the signer
+      const tokenContract902 = new ethers.Contract(L2NativeSuperchainERC20Address, erc20ABI, signer902);
+      console.log("Token contract address on Chain 902:", L2NativeSuperchainERC20Address);
+
+      // Request approval
+      setTransactionStatus("Requesting approval");
+      const approveTx = await tokenContract902.approve(StoreContractAddress, ITEM_PRICE);
+      await approveTx.wait();
+      console.log("Approval successful");
+
+      // Step 3: Complete the purchase on Chain 902
+      console.log("Completing purchase on Chain 902...");
+      setTransactionStatus("Completing purchase");
+      const storeContract = new ethers.Contract(StoreContractAddress, storeABI, signer902);
+      console.log("Store contract address:", StoreContractAddress);
+
+      // Attempt to complete purchase
+      const purchaseTx = await storeContract.completePurchase(address, 1, {
+        gasLimit: 500000,
+      });
+      console.log("Purchase transaction sent", purchaseTx.hash);
+
+      // Wait for the transaction and get the receipt
+      const receipt = await purchaseTx.wait();
+
+      setTransactionHash(purchaseTx.hash);
+      console.log("Purchase transaction receipt", receipt);
+      console.log(receipt.logs);
+
+      // Check if the transaction was successful
+      if (receipt.status === 0) {
+        throw new Error("Transaction failed");
+      }
 
       await fetchBalances();
       setShowBalanceSelector(false);
@@ -311,25 +292,6 @@ export const Purchase = () => {
     }
   };
 
-  const checkAllowance = async () => {
-    try {
-      // Use Chain 902 provider and signer, assuming you want to check the allowance on Chain 902
-      const provider902 = new ethers.JsonRpcProvider(localChain902.rpcUrls.default.http[0]);
-      const signer902 = new ethers.Wallet(HARDCODED_PRIVATE_KEY, provider902);
-
-      // Create a contract instance for the token contract on Chain 902
-      const tokenContract902 = new ethers.Contract(L2NativeSuperchainERC20Address, erc20ABI, signer902);
-
-      // Get the allowance for the Store contract
-      const allowance = await tokenContract902.allowance(address, StoreContractAddress);
-      console.log(`Allowance for Store Contract on Chain 902: ${ethers.formatEther(allowance)} tokens`);
-
-      return allowance;
-    } catch (error) {
-      console.error("Error checking allowance:", error);
-    }
-  };
-
   const handleBuyTicketClick = () => {
     setShowBalanceSelector(true);
     setShowInsufficientFundsWarning(parseFloat(balanceChain901) < 10 && parseFloat(balanceChain902) < 10);
@@ -344,7 +306,7 @@ export const Purchase = () => {
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 py-12 p-4">
       {showConfetti && <ReactConfetti />}
-      <h1 className="text-4xl font-bold text-center mb-8">Interop Demo</h1>
+      <h1 className="text-4xl font-bold text-center mb-8">Interop Demo - Cross Chain Purchase Example</h1>
       <div className="flex justify-center w-full max-w-6xl mx-auto space-x-6">
         {/* Left card for user information */}
         <div className="w-1/3 bg-white shadow-lg rounded-lg p-6">
@@ -399,7 +361,6 @@ export const Purchase = () => {
 
         {/* Main card for purchase functionality */}
         <div className="w-2/3 bg-white shadow-lg rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-center mb-6">Cross-Chain Purchase Demo</h2>
 
           <div className="mb-6 bg-gray-100 p-4 rounded-lg">
             <h3 className="text-lg font-semibold mb-2">OPalooza</h3>

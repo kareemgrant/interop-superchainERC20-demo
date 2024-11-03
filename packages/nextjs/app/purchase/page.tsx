@@ -1,5 +1,5 @@
-import { Purchase } from "~~/components/purchase/Purchase";
+import { NewPurchase } from "~~/components/purchase/NewPurchase";
 
 export default function PurchasePage() {
-  return <Purchase />;
+  return <NewPurchase />;
 }
